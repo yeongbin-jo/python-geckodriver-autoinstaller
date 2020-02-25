@@ -9,6 +9,7 @@ import urllib.request
 import urllib.error
 import logging
 import tarfile
+import zipfile
 
 from io import BytesIO
 
@@ -40,15 +41,24 @@ def get_platform_architecture():
     if sys.platform.startswith('linux') and sys.maxsize > 2 ** 32:
         platform = 'linux'
         architecture = '64'
+        extention = '.tar.gz'
     elif sys.platform == 'darwin':
         platform = 'mac'
         architecture = 'os'
+        extention = '.tar.gz'
     elif sys.platform.startswith('win'):
         platform = 'win'
         architecture = '32'
+        path1 = 'C:\\PROGRA~1\\Mozilla Firefox\\firefox.exe'
+        path2 = 'C:\\PROGRA~2\\Mozilla Firefox\\firefox.exe'
+        if os.path.exists(path1):
+            architecture = get_win_binary_archtecture(path1)
+        elif os.path.exists(path2):
+            architecture = get_win_binary_archtecture(path2)
+        extention = '.zip'
     else:
         raise RuntimeError('Could not determine geckodriver download URL for this platform.')
-    return platform, architecture
+    return platform, architecture, extention
 
 
 def get_geckodriver_url(version):
@@ -58,9 +68,9 @@ def get_geckodriver_url(version):
     :param version: the version of geckodriver
     :return: Download URL for geckodriver
     """
-    platform, architecture = get_platform_architecture()
+    platform, architecture, extention = get_platform_architecture()
     return f'https://github.com/mozilla/geckodriver/releases/download/{version}' \
-           f'/geckodriver-{version}-{platform}{architecture}.tar.gz'
+           f'/geckodriver-{version}-{platform}{architecture}{extention}'
 
 
 def find_binary_in_path(filename):
@@ -79,11 +89,30 @@ def find_binary_in_path(filename):
     return None
 
 
+def get_win_binary_archtecture(filepath):
+    """
+    Locate the architecture by looking for the PE header in the binary.
+    :param filepath: Fullpath of the binary
+    :return: Archtecture number string
+    """
+    p = 0
+    with open(filepath, 'rb') as bin:
+        while p < 0xFF:
+            b = bin.read(8)
+            print(p)
+            print(b)
+            if b.startswith(b'\x50\x45\x00\x00\x4C\x01'):
+                return '32'
+            elif b.startswith(b'\x50\x45\x00\x00\x64\x86'):
+                return '64'
+            p += 1
+
+
 def get_firefox_version():
     """
     :return: the version of firefox installed on client
     """
-    platform, _ = get_platform_architecture()
+    platform, _, _ = get_platform_architecture()
     if platform == 'linux':
         with subprocess.Popen(['firefox', '--version'], stdout=subprocess.PIPE) as proc:
             version = proc.stdout.read().decode('utf-8').replace('Mozilla Firefox', '').strip()
@@ -179,9 +208,16 @@ def download_geckodriver(cwd=False):
             raise RuntimeError(f'Failed to download geckodriver archive: {url}')
         archive = BytesIO(response.read())
 
-        tar = tarfile.open(fileobj=archive, mode='r:gz')
-        tar.extractall(geckodriver_dir)
-        tar.close()
+        if url.endswith('.tar.gz'):
+            tar = tarfile.open(fileobj=archive, mode='r:gz')
+            tar.extractall(geckodriver_dir)
+            tar.close()
+        elif url.endswith('.zip'):
+            zip_file = zipfile.ZipFile(archive)
+            zip_file.extractall(geckodriver_dir)
+            zip_file.close()
+        else:
+            raise RuntimeError('Failed to extract geckodriver archive: {}'.format(url))
     else:
         logging.debug('geckodriver is already installed.')
     if not os.access(geckodriver_filepath, os.X_OK):

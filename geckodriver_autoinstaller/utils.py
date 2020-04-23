@@ -9,6 +9,7 @@ import urllib.request
 import urllib.error
 import logging
 import tarfile
+import zipfile
 
 from io import BytesIO
 
@@ -59,8 +60,14 @@ def get_geckodriver_url(version):
     :return: Download URL for geckodriver
     """
     platform, architecture = get_platform_architecture()
+
+    if platform == 'win':
+        compression = 'zip'
+    else:
+        compression = 'tar.gz'
+
     return f'https://github.com/mozilla/geckodriver/releases/download/{version}' \
-           f'/geckodriver-{version}-{platform}{architecture}.tar.gz'
+           f'/geckodriver-{version}-{platform}{architecture}.{compression}'
 
 
 def find_binary_in_path(filename):
@@ -179,14 +186,23 @@ def download_geckodriver(cwd=False):
             raise RuntimeError(f'Failed to download geckodriver archive: {url}')
         archive = BytesIO(response.read())
 
-        tar = tarfile.open(fileobj=archive, mode='r:gz')
-        tar.extractall(geckodriver_dir)
-        tar.close()
+        uncompress(archive, geckodriver_dir)
     else:
         logging.debug('geckodriver is already installed.')
     if not os.access(geckodriver_filepath, os.X_OK):
         os.chmod(geckodriver_filepath, 0o744)
     return geckodriver_filepath
+
+def uncompress(file, directory):
+    platform, _ = get_platform_architecture()
+
+    if platform == 'win':
+        with zipfile.ZipFile(file, 'r') as zip_ref:
+            zip_ref.extractall(directory)
+    else:
+        tar = tarfile.open(fileobj=file, mode='r:gz')
+        tar.extractall(directory)
+        tar.close()
 
 
 if __name__ == '__main__':

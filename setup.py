@@ -32,7 +32,7 @@ setup(
     version="0.1.0",
     author="Yeongbin Jo",
     author_email="yeongbin.jo@pylab.co",
-    description="Automatically install geckodriver that supports the currently installed version of chrome.",
+    description="Automatically install geckodriver that supports the currently installed version of firefox.",
     license="MIT",
     keywords="geckodriver chrome selenium splinter",
     url="https://github.com/yeongbin-jo/python-geckodriver-autoinstaller",
